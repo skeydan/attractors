@@ -60,7 +60,7 @@ ds_test <- tensor_slices_dataset(x_test) %>%
 
 n_latent <- 10L
 n_features <- 1
-fnn_weight <- 20
+fnn_weight <- 10
 
 
 encoder_model <- function(n_timesteps,
