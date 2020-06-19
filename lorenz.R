@@ -103,10 +103,11 @@ x_z_anim <- ggplot(lorenz_ts %>%
     size = 0.4,
     color = "darkgrey"
   ) +
-  geom_point(size = 2, color = "violet") +
+  geom_point(size = 4, color = "#B57EDC") +
   theme_void()  +
   coord_equal() +
   transition_time(time = time)
 
-# animate(x_z_anim, nframes = 10000, fps = 50, renderer = gifski_renderer())
-# anim_save("x_z.gif")
+#animate(x_z_anim, nframes = 10000, fps = 50, renderer = gifski_renderer())
+#anim_save("x_z.gif")
+

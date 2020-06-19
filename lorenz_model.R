@@ -127,17 +127,14 @@ decoder <- decoder_model(n_timesteps,
                          n_latent)
 
 
-optimizer <- optimizer_adam(lr = 1e-3)
-
 mse_loss <- tf$keras$losses$MeanSquaredError(reduction = tf$keras$losses$Reduction$SUM)
 
 loss_false_nn <- function(x) {
   
-  
   # changing these parameters is equivalent to
   # changing the strength of the regularizer, so we keep these fixed (these values
   # correspond to the original values used in Kennel et al 1992).
-  rtol <- 20
+  rtol <- 10 
   atol <- 2
   k_frac <- 0.01
   
@@ -227,7 +224,6 @@ loss_false_nn <- function(x) {
   reg_weights <-
     1 - tf$reduce_mean(tf$cast(total_false_neighbors, tf$float32), axis = c(1L, 2L))
   # (latent,)
-  temp = reg_weights
   reg_weights <- tf$pad(reg_weights, list(list(1L, 0L)))
   
   # Find batch average activity
@@ -289,6 +285,10 @@ training_loop <- tf_function(autograph(function(ds_train) {
   
 }))
 
+fnn_weight <- 10
+
+optimizer <- optimizer_adam(lr = 1e-3)
+
 for (epoch in 1:200) {
   cat("Epoch: ", epoch, " -----------\n")
   training_loop(ds_train)  
@@ -305,24 +305,22 @@ predicted <- encoder(test_batch) %>%
 
 predicted %>% summarise_all(var)
 
+
 # plot attractors on test set ---------------------------------------------------
 
+v1_2 <- ggplot(predicted, aes(V1, V2)) +
+  geom_path(size = 0.1, color = "darkgrey") +
+  theme_classic() + 
+  theme(aspect.ratio = 1)
 
-v1_2 <- ggplot(predicted,
-               aes(V1, V2)) +
-  geom_path(size = 0.2) +
+v1_3 <- ggplot(
+  predicted, aes(V1, V4)) +
+  geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
 
-v1_3 <- ggplot(predicted ,
-               aes(V1, V3)) +
-  geom_path(size = 0.2) +
-  theme_classic() +
-  theme(aspect.ratio = 1)
-
-v2_3 <- ggplot(predicted,
-               aes(V2, V3)) +
-  geom_path(size = 0.2) +
+v2_3 <- ggplot(predicted, aes(V2, V4)) +
+  geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
 
