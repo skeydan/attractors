@@ -1,11 +1,3 @@
-# - predict complete training set to obtain attractor
-# 
-# - predict latent code for that one test sample
-# 
-# - find nearest k neighbors in training set attractr, average
-# 
-# - apply decoder step to that averaged code and use that as prediction
-
 library(keras)
 library(tfdatasets)
 library(reticulate)
