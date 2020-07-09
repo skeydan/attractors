@@ -7,4 +7,5 @@ convection.txt
 *.data-0000*-of-*
 *.index
 *.gif
+*.hdf5
 

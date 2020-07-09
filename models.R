@@ -29,10 +29,10 @@ decoder_model <- function(n_timesteps,
   
   keras_model_custom(name = name, function(self) {
     
-    self$repeat_vector <- layer_repeat_vector(n = n_timesteps - 1)
+    self$repeat_vector <- layer_repeat_vector(n = n_timesteps)
     self$noise <- layer_gaussian_noise(stddev = 0.5)
     self$lstm <- layer_lstm(
-      units = n_timesteps - 1,
+      units = n_timesteps,
       return_sequences = TRUE,
       go_backwards = TRUE
     ) 
@@ -52,3 +52,28 @@ decoder_model <- function(n_timesteps,
   })
 }
 
+lstm <- function(n_latent, n_timesteps, n_features, dropout, recurrent_dropout) {
+  model <- keras_model_sequential() %>%
+    layer_lstm(
+      units = n_latent,
+      input_shape = c(n_timesteps, n_features),
+      dropout = dropout, 
+      recurrent_dropout = recurrent_dropout,
+      return_sequences = TRUE
+    ) %>% 
+    layer_lstm(
+      units = n_latent,
+      dropout = dropout,
+      recurrent_dropout = recurrent_dropout,
+      return_sequences = TRUE
+    ) %>% 
+    time_distributed(layer_dense(units = 1))
+  
+  model %>%
+    compile(
+      loss = "mse",
+      optimizer = "adam"
+    )
+  model
+  
+}

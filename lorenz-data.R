@@ -1,7 +1,6 @@
 library(deSolve)
 library(tidyverse)
-library(cowplot)
-library(gganimate)
+library(tfdatasets)
 
 source("utils.R")
 
@@ -38,87 +37,21 @@ lorenz_ts <-
     method = "lsoda"
   ) %>% as_tibble()
 
-
-lorenz_ts[1:10,]
-
 # original variance
 vars <- lorenz_ts %>%
   summarise_all(var)
 
 
-# plot --------------------------------------------------------------------
+
+# Preprocess --------------------------------------------------------------
+
+n_timesteps <- 8
+batch_size <- 100
 
 # every 10th x
 obs <- lorenz_ts %>%
   select(time, x) %>%
   filter(row_number() %% 10 == 0)
-
-ggplot(obs, aes(time, x)) +
-  geom_line() +
-  coord_cartesian(xlim = c(0, 100)) +
-  theme_classic()
-
-# attractors, projected to 2d
-y_z <- ggplot(lorenz_ts %>%
-                select(y, z) %>%
-                slice(1:10000),
-              aes(y, z)) +
-  geom_path(size = 0.2) +
-  coord_cartesian(xlim = c(-25, 25), ylim = c(0, 50)) +
-  theme_classic() +
-  theme(aspect.ratio = 1)
-
-x_z <- ggplot(lorenz_ts %>%
-                select(x, z) %>%
-                slice(1:10000),
-              aes(x, z)) +
-  geom_path(size = 0.2) +
-  coord_cartesian(xlim = c(-25, 25), ylim = c(0, 50)) +
-  theme_classic() +
-  theme(aspect.ratio = 1)
-
-x_y <- ggplot(lorenz_ts %>%
-                select(x, y) %>%
-                slice(1:10000),
-              aes(x, y)) +
-  geom_path(size = 0.2) +
-  coord_cartesian(xlim = c(-25, 25), ylim = c(-25, 25)) +
-  theme_classic() +
-  theme(aspect.ratio = 1)
-
-# plot_grid(x_y, y_z, x_z, ncol = 3)
-
-
-
-# animate -----------------------------------------------------------------
-
-
-x_z_anim <- ggplot(lorenz_ts %>%
-                     select(time, x, z) %>%
-                     slice(1:10000),
-                   aes(x, z)) +
-  geom_path(
-    data = lorenz_ts %>%
-      select(x, z) %>%
-      slice(1:10000),
-    aes(x, z),
-    size = 0.4,
-    color = "darkgrey"
-  ) +
-  geom_point(size = 4, color = "#B57EDC") +
-  theme_void()  +
-  coord_equal() +
-  transition_time(time = time)
-
-#animate(x_z_anim, nframes = 10000, fps = 50, renderer = gifski_renderer())
-#anim_save("x_z.gif")
-
-
-# Preprocess --------------------------------------------------------------
-
-n_timesteps <- 10
-batch_size <- 100
-
 
 obs <- obs %>% mutate(
   x = scale(x)
@@ -126,18 +59,23 @@ obs <- obs %>% mutate(
 
 n <- nrow(obs)
 
-# train with start of time series, test with end of time series 
-x_train <- gen_timesteps(as.matrix(obs$x)[1:(n/2)], n_timesteps)
-x_test <- gen_timesteps(as.matrix(obs$x)[(n/2):n], n_timesteps) 
+train <- gen_timesteps(as.matrix(obs$x)[1:(n/2)], 2 * n_timesteps)
+test <- gen_timesteps(as.matrix(obs$x)[(n/2):n], 2 * n_timesteps) 
 
-dim(x_train) <- c(dim(x_train), 1)
-dim(x_test) <- c(dim(x_test), 1)
+dim(train) <- c(dim(train), 1)
+dim(test) <- c(dim(test), 1)
 
-y_train <- x_train[ , 2:10, 1, drop = FALSE]
-y_test <- x_test[ , 2:10, 1, drop = FALSE]
+x_train <- train[ , 1:8, , drop = FALSE]
+y_train <- train[ , 9:16, , drop = FALSE]
+x_train[1:8, , 1]
+y_train[1:8, , 1]
 
 ds_train <- tensor_slices_dataset(list(x_train, y_train)) %>%
+  dataset_shuffle(nrow(x_train)) %>%
   dataset_batch(batch_size)
+
+x_test <- test[ , 1:8, , drop = FALSE]
+y_test <- test[ , 9:16, , drop = FALSE]
 
 ds_test <- tensor_slices_dataset(list(x_test, y_test)) %>%
   dataset_batch(nrow(x_test))
