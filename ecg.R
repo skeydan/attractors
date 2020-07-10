@@ -7,26 +7,30 @@ library(cowplot)
 
 
 
-geyser <- py_load_object("data/geyser_train_test.pkl")
+ecg_train <- py_load_object("data/ecg_train.pkl")
+ecg_test <- py_load_object("data/ecg_test.pkl")
 
-n <- 10000
-geyser <- geyser[1:(2 * n)]
+n <- 5000
+ecg_train <- ecg_train[1:n]
+ecg_test <- ecg_test[1:n]
 
-ggplot(data.frame(temp = geyser[1:1000]), aes(x = 1:1000, y = temp)) + 
+ggplot(data.frame(bpm = ecg_train[1:1000]), aes(x = 1:1000, y = bpm)) + 
   geom_line() +
   theme_classic() +
   theme(
     axis.title.x=element_blank(),
     axis.ticks.x=element_blank())
-  
 
-geyser <- scale(geyser)
+ecg_train <- scale(ecg_train)
+train_mean <- attr(ecg_train, "scaled:center")
+train_sd <- attr(ecg_train, "scaled:scale")
+ecg_test <- scale(ecg_test, center = train_mean, scale = train_sd)
 
 n_timesteps <- 8
 batch_size <- 100
 
-train <- gen_timesteps(geyser[1:(n/2)], 2 * n_timesteps)
-test <- gen_timesteps(geyser[(n/2):n], 2 * n_timesteps) 
+train <- gen_timesteps(ecg_train, 2 * n_timesteps)
+test <- gen_timesteps(ecg_test, 2 * n_timesteps) 
 
 dim(train) <- c(dim(train), 1)
 dim(test) <- c(dim(test), 1)
@@ -70,7 +74,7 @@ train_fnn <- tf$keras$metrics$Mean(name = 'train_fnn')
 train_mse <-  tf$keras$metrics$Mean(name = 'train_mse')
 
 
-fnn_multiplier <- 0.7
+fnn_multiplier <- 1
 fnn_weight <- fnn_multiplier * nrow(x_train)/batch_size
 
 optimizer <- optimizer_adam(lr = 1e-3)
@@ -85,9 +89,8 @@ for (epoch in 1:200) {
   print(test_var %>% as.numeric() %>% round(5))
 }
 
-encoder %>% save_model_weights_tf(paste0("geyser_encoder_", fnn_multiplier))
-decoder %>% save_model_weights_tf(paste0("geyser_decoder_", fnn_multiplier))
-
+encoder %>% save_model_weights_tf(paste0("ecg_encoder_", fnn_multiplier))
+decoder %>% save_model_weights_tf(paste0("ecg_decoder_", fnn_multiplier))
 
 # check variances -------------------------------------------------------------
 
@@ -107,12 +110,12 @@ a1 <- ggplot(encoded, aes(V1, V2)) +
   theme_classic() +
   theme(aspect.ratio = 1)
 
-a2 <- ggplot(encoded, aes(V1, V7)) +
+a2 <- ggplot(encoded, aes(V1, V3)) +
   geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
 
-a3 <- ggplot(encoded, aes(V2, V7)) +
+a3 <- ggplot(encoded, aes(V2, V3)) +
   geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
@@ -139,31 +142,25 @@ mse_fnn <- get_mse(test_batch, prediction_fnn)
 
 # lstm --------------------------------------------------------------------
 
-model <- lstm(n_latent, n_timesteps, n_features, dropout = 0, recurrent_dropout = 0)
+model <- lstm(n_latent, n_timesteps, n_features, dropout = 0.3, recurrent_dropout = 0.3,
+              optimizer = optimizer_adam(lr =  1e-4))
 
 history <- model %>% fit(
   ds_train,
   validation_data = ds_test,
   epochs = 200)
 
-model %>% save_model_hdf5("geyser-lstm.hdf5")
+model %>% save_model_hdf5("ecg-lstm.hdf5")
 
 prediction_lstm <- model %>% predict(ds_test)
 
 mse_lstm <- get_mse(test_batch, prediction_lstm)
 
-# 0.5
+# for mult = 1
 # > mse_fnn
-# [1] 0.1794896 0.4213111 0.5680545 0.6563896 0.7078483 0.7351122 0.7399738 0.7351620
+# [1] 0.3053243 0.4761404 0.6203175 0.7721968 0.8630189 0.9154946 0.9216658 0.8994402
 # > mse_lstm
-# [1] 0.8596233 0.8638348 0.8399315 0.8266606 0.8027516 0.7808511 0.7653921 0.7542365
+# [1] 1.019974 1.060477 1.084976 1.086563 1.075706 1.063090 1.051633 1.042064
 
 
-# 0.7
-#> mse_fnn
-#[1] 0.1743249 0.4184542 0.5609179 0.6515022 0.7126671 0.7483752 0.7556070 0.7468666
-
-compare_preds_df <- 
-  data.frame(tf$concat(list(test_batch[[1]][, , 1], test_batch[[2]][, , 1]), axis = 1L) %>%
-                        as.array())
 
