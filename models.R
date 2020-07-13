@@ -61,18 +61,18 @@ decoder_model <- function(n_timesteps,
   })
 }
 
-lstm <- function(n_latent, n_timesteps, n_features, dropout, recurrent_dropout,
+lstm <- function(n_latent, n_timesteps, n_features, n_hidden, dropout, recurrent_dropout,
                  optimizer = optimizer_adam(lr =  1e-3)) {
   model <- keras_model_sequential() %>%
     layer_lstm(
-      units = n_latent,
+      units = n_hidden,
       input_shape = c(n_timesteps, n_features),
       dropout = dropout, 
       recurrent_dropout = recurrent_dropout,
       return_sequences = TRUE
     ) %>% 
     layer_lstm(
-      units = n_latent,
+      units = n_hidden,
       dropout = dropout,
       recurrent_dropout = recurrent_dropout,
       return_sequences = TRUE

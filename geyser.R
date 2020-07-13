@@ -85,19 +85,22 @@ fnn_weight <- fnn_multiplier * nrow(x_train)/batch_size
 
 optimizer <- optimizer_adam(lr = 1e-3)
 
-for (epoch in 1:200) {
-  cat("Epoch: ", epoch, " -----------\n")
-  training_loop(ds_train)
-  
-  test_batch <- as_iterator(ds_test) %>% iter_next()
-  encoded <- encoder(test_batch[[1]]) 
-  test_var <- tf$math$reduce_variance(encoded, axis = 0L)
-  print(test_var %>% as.numeric() %>% round(5))
-}
+# for (epoch in 1:200) {
+#   cat("Epoch: ", epoch, " -----------\n")
+#   training_loop(ds_train)
+#   
+#   test_batch <- as_iterator(ds_test) %>% iter_next()
+#   encoded <- encoder(test_batch[[1]]) 
+#   test_var <- tf$math$reduce_variance(encoded, axis = 0L)
+#   print(test_var %>% as.numeric() %>% round(5))
+# }
+# 
+# encoder %>% save_model_weights_tf(paste0("geyser_encoder_", fnn_multiplier))
+# decoder %>% save_model_weights_tf(paste0("geyser_decoder_", fnn_multiplier))
 
-encoder %>% save_model_weights_tf(paste0("geyser_encoder_", fnn_multiplier))
-decoder %>% save_model_weights_tf(paste0("geyser_decoder_", fnn_multiplier))
 
+encoder %>% load_model_weights_tf(paste0("geyser_encoder_", fnn_multiplier))
+decoder %>% load_model_weights_tf(paste0("geyser_decoder_", fnn_multiplier))
 
 # check variances -------------------------------------------------------------
 
@@ -108,6 +111,8 @@ encoded <- encoder(test_batch[[1]]) %>%
   as_tibble()
 
 encoded %>% summarise_all(var)
+# V1     V2       V3       V4       V5      V6      V7      V8      V9     V10
+# 1 0.265 0.0271  7.84e-5  5.70e-7 0.000543 3.42e-4 2.46e-4 1.29e-4 5.11e-4 3.62e-4
 
 
 # plot attractors on test set ---------------------------------------------------
@@ -117,12 +122,12 @@ a1 <- ggplot(encoded, aes(V1, V2)) +
   theme_classic() +
   theme(aspect.ratio = 1)
 
-a2 <- ggplot(encoded, aes(V1, V7)) +
+a2 <- ggplot(encoded, aes(V1, V5)) +
   geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
 
-a3 <- ggplot(encoded, aes(V2, V7)) +
+a3 <- ggplot(encoded, aes(V2, V5)) +
   geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
@@ -136,27 +141,20 @@ plot_grid(a1, a2, a3, ncol = 3)
 
 prediction_fnn <- decoder(encoder(test_batch[[1]]))
 
-prediction_fnn[1:10, , 1] %>% as.array()
-
-test_batch[[2]][1:10, , 1] %>% as.array()
-
-test_batch[[1]][1:10, , 1] %>% as.array()
-
-
 mse_fnn <- get_mse(test_batch, prediction_fnn)
 
 
 
 # lstm --------------------------------------------------------------------
 
-model <- lstm(n_latent, n_timesteps, n_features, dropout = 0, recurrent_dropout = 0)
-
-history <- model %>% fit(
-  ds_train,
-  validation_data = ds_test,
-  epochs = 200)
-
-model %>% save_model_hdf5("geyser-lstm.hdf5")
+# model <- lstm(n_latent, n_timesteps, n_features, dropout = 0, recurrent_dropout = 0)
+# 
+# history <- model %>% fit(
+#   ds_train,
+#   validation_data = ds_test,
+#   epochs = 200)
+# 
+# model %>% save_model_hdf5("geyser-lstm.hdf5")
 model <- load_model_hdf5("geyser-lstm.hdf5")
 
 test_batch <- as_iterator(ds_test) %>% iter_next()
@@ -165,27 +163,24 @@ prediction_lstm <- model %>% predict(ds_test)
 
 mse_lstm <- get_mse(test_batch, prediction_lstm)
 
-# 0.5
-# > mse_fnn
-# [1] 0.1794896 0.4213111 0.5680545 0.6563896 0.7078483 0.7351122 0.7399738 0.7351620
-# 0.7
 #> mse_fnn
 #[1] 0.1743249 0.4184542 0.5609179 0.6515022 0.7126671 0.7483752 0.7556070 0.7468666
 
+# [1] 0.3814891 0.5110050 0.5736291 0.5890495 0.5946818 0.6051609 0.6250113
+# [8] 0.6500638 0.6693160 0.6828012 0.6932985 0.7053073 0.7041866 0.6996050
+# [15] 0.7037117 0.7072416 0.7069045 0.7080551 0.7145087 0.7092809 0.7045435
+# [22] 0.7085868 0.7087260 0.7097822 0.7064175 0.7069261 0.7143834 0.7131030
+# [29] 0.7111084 0.7146822 0.7199935 0.7171039 0.7107147 0.7066788 0.7022842
+# [36] 0.7017120 0.7023662 0.7019490 0.6914956 0.6864950 0.6939680 0.7048042
+# [43] 0.7228798 0.7762417 0.8176706 0.8338339 0.8177023 0.8306618 0.8666893
+# [50] 0.8894805 0.9060865 0.9260449 0.9446564 0.9513241 0.9371954 0.9269431
+# [57] 0.9251430 0.9323774 0.9403623 0.9486062
+
 
 # > mse_lstm
-# [1] 0.9025139 0.8522131 0.8259575 0.8110787 0.7985898 0.7847978 0.7710731 0.7590278 0.7491193
-# [10] 0.7407346 0.7330293 0.7253728 0.7152035 0.7041104 0.6950241 0.6877765 0.6808039 0.6736727
-# [19] 0.6670824 0.6618595 0.6582018 0.6548377 0.6514161 0.6487431 0.6470793 0.6453608 0.6424494
-# [28] 0.6387382 0.6350009 0.6318269 0.6298718 0.6298243 0.6314871 0.6337807 0.6351997 0.6350761
-# [37] 0.6338936 0.6321963 0.6313722 0.6315157 0.6315492 0.6318302 0.6319601 0.6319010 0.6319674
-# [46] 0.6325347 0.6330479 0.6348631 0.6362745 0.6374549 0.6383519 0.6389980 0.6392849 0.6391275
-# [55] 0.6387466 0.6380682 0.6373467 0.6367899 0.6366458 0.6368802
 
 
 
-
-  
 given <- data.frame(
   as.array(
     tf$concat(list(test_batch[[1]][ , , 1], test_batch[[2]][ , , 1]),
@@ -203,13 +198,15 @@ lstm <- data.frame(as.array(prediction_lstm[ , , 1]) %>%
   add_column(type = "lstm") %>%
   add_column(num = (n_timesteps + 1):(2 * n_timesteps))
 
-compare_preds_df <- bind_rows(given, lstm)#, fnn
-
+compare_preds_df <- bind_rows(given, lstm, fnn)
 
 plots <- purrr::map(sample(1: dim(compare_preds_df)[2], 16), 
-                    function(v) ggplot(compare_preds_df, aes(num, .data[[paste0("X", v)]], color = type)) + geom_line() )
+                    function(v) ggplot(compare_preds_df, aes(num, .data[[paste0("X", v)]], color = type)) +
+                      geom_line() + 
+                      theme_classic() + 
+                      theme(legend.position = "none"))
 
 
 plot_grid(plotlist = plots, ncol = 4)
 
-plots[[2]]
+
