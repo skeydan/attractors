@@ -147,7 +147,7 @@ mse_fnn <- get_mse(test_batch, prediction_fnn)
 
 # lstm --------------------------------------------------------------------
 
-# model <- lstm(n_latent, n_timesteps, n_features, dropout = 0, recurrent_dropout = 0)
+# model <- lstm(n_latent, n_timesteps, n_features, n_hidden, dropout = 0.2, recurrent_dropout = 0.2)
 # 
 # history <- model %>% fit(
 #   ds_train,
