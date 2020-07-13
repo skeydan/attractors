@@ -5,6 +5,8 @@ library(reticulate)
 
 ds <- py_load_object("data/geyser_train_test.pkl")
 ds <- py_load_object("data/electricity_train_test.pkl")
+ds <- py_load_object("data/ecg_train.pkl")
+ds <- py_load_object("data/mouse.pkl")
 
 
 
@@ -48,8 +50,10 @@ cd = corrDim(
   min.embedding.dim = emb.dim,
   max.embedding.dim = emb.dim + 5,
   time.lag = tau.ami,
-  min.radius = 0.001,
-  max.radius = 50,
+  #min.radius = 0.001,
+  #max.radius = 50,
+  min.radius = 0.99,
+  max.radius = 3,
   n.points.radius = 40,
   do.plot = FALSE
 )
@@ -58,12 +62,20 @@ plot(cd)
 cd.est = estimate(cd,
                   #regression.range = c(5, 17),
                   #use.embeddings = 8:12
-                  regression.range = c(20, 30),
-                  use.embeddings = 10:13
+                  #regression.range = c(20, 30),
+                  #use.embeddings = 10:13
+                  #regression.range = c(5, 15),
+                  #use.embeddings = 13:16
+                  regression.range = c(1, 2),
+                  use.embeddings = 12:16
                   )
 
 cd.est
+# geyser 1.7
 # elec 6.0
+# ecg 3.69
+# mouse 0.15
+
 
 
 # entropy -----------------------------------------------------------------
@@ -74,7 +86,10 @@ se.est = estimate(se, do.plot = F,
                   regression.range = c(5, 17))
 mean(se.est)
 
+# geyser 0.22
 # elec 0.41
+# ecg 0.2
+# mouse nan
 
 
 
@@ -121,7 +136,10 @@ ml.est = estimate(
 )
 ml.est
 
+# geyser 0.27
 # elec 0
+# ecg 0
+# mouse  -0.1
 
 
 
@@ -137,4 +155,7 @@ st = surrogateTest(
 
 plot(st)
 
+# geyser reject
 # elec accept
+# ecg reject
+# mouse accept
