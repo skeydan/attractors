@@ -1,29 +1,38 @@
 encoder_model <- function(n_timesteps,
                           n_features,
+                          n_hidden,
                           n_latent,
                           name = NULL) {
   
   keras_model_custom(name = name, function(self) {
     
     self$noise <- layer_gaussian_noise(stddev = 0.5)
-    self$lstm <-  layer_lstm(
-      units = n_latent,
+    self$lstm1 <-  layer_lstm(
+      units = n_hidden,
       input_shape = c(n_timesteps, n_features),
+      return_sequences = TRUE
+    ) 
+    self$batchnorm1 <- layer_batch_normalization()
+    self$lstm2 <-  layer_lstm(
+      units = n_latent,
       return_sequences = FALSE
     ) 
-    self$batchnorm <- layer_batch_normalization()
+    self$batchnorm2 <- layer_batch_normalization()
     
     function (x, mask = NULL) {
       x %>%
         self$noise() %>%
-        self$lstm() %>%
-        self$batchnorm() 
+        self$lstm1() %>%
+        self$batchnorm1() %>%
+        self$lstm2() %>%
+        self$batchnorm2() 
     }
   })
 }
 
 decoder_model <- function(n_timesteps,
                           n_features,
+                          n_hidden,
                           n_latent,
                           name = NULL) {
   
@@ -32,7 +41,7 @@ decoder_model <- function(n_timesteps,
     self$repeat_vector <- layer_repeat_vector(n = n_timesteps)
     self$noise <- layer_gaussian_noise(stddev = 0.5)
     self$lstm <- layer_lstm(
-      units = n_timesteps,
+      units = n_hidden,
       return_sequences = TRUE,
       go_backwards = TRUE
     ) 

@@ -23,7 +23,7 @@ get_mse <- function(test_batch, prediction) {
     bind_cols(data.frame(prediction[, , 1] %>% as.array()) %>%
                 rename_with(function(name)
                   paste0(name, "_pred")))
-  mse <- purrr::map(1:8,
+  mse <- purrr::map(1:dim(prediction)[2],
                         function(varno)
                           calc_mse(comp_df,
                                    paste0("X", varno, "_true"),
