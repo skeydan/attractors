@@ -21,13 +21,20 @@ ggplot(data.frame(bpm = ecg_train[1:1000]), aes(x = 1:1000, y = bpm)) +
     axis.title.x=element_blank(),
     axis.ticks.x=element_blank())
 
+ggplot(data.frame(bpm = ecg_train[1:400]), aes(x = 1:400, y = bpm)) + 
+  geom_line() +
+  theme_classic() +
+  theme(
+    axis.title.x=element_blank(),
+    axis.ticks.x=element_blank())
+
 ecg_train <- scale(ecg_train)
 train_mean <- attr(ecg_train, "scaled:center")
 train_sd <- attr(ecg_train, "scaled:scale")
 ecg_test <- scale(ecg_test, center = train_mean, scale = train_sd)
 
-n_timesteps <- 8
-batch_size <- 100
+n_timesteps <- 120
+batch_size <- 32
 
 train <- gen_timesteps(ecg_train, 2 * n_timesteps)
 test <- gen_timesteps(ecg_test, 2 * n_timesteps) 
@@ -35,35 +42,38 @@ test <- gen_timesteps(ecg_test, 2 * n_timesteps)
 dim(train) <- c(dim(train), 1)
 dim(test) <- c(dim(test), 1)
 
-x_train <- train[ , 1:8, , drop = FALSE]
-y_train <- train[ , 9:16, , drop = FALSE]
-x_train[1:8, , 1]
-y_train[1:8, , 1]
+x_train <- train[ , 1:n_timesteps, , drop = FALSE]
+y_train <- train[ , (n_timesteps + 1):(2*n_timesteps), , drop = FALSE]
+x_train[1:4, , 1]
+y_train[1:4, , 1]
 
 ds_train <- tensor_slices_dataset(list(x_train, y_train)) %>%
   dataset_shuffle(nrow(x_train)) %>%
   dataset_batch(batch_size)
 
-x_test <- test[ , 1:8, , drop = FALSE]
-y_test <- test[ , 9:16, , drop = FALSE]
+x_test <- test[ , 1:n_timesteps, , drop = FALSE]
+y_test <- test[ , (n_timesteps + 1):(2*n_timesteps), , drop = FALSE]
 
 ds_test <- tensor_slices_dataset(list(x_test, y_test)) %>%
   dataset_batch(nrow(x_test))
 
 
+
 # autoencoder -------------------------------------------------------------------
 
-n_latent <- as.integer(n_timesteps)
+n_latent <- 10L
 n_features <- 1
+n_hidden <- 32
 
 encoder <- encoder_model(n_timesteps,
                          n_features,
+                         n_hidden,
                          n_latent)
 
 decoder <- decoder_model(n_timesteps,
                          n_features,
+                         n_hidden,
                          n_latent)
-
 
 mse_loss <-
   tf$keras$losses$MeanSquaredError(reduction = tf$keras$losses$Reduction$SUM)
@@ -129,21 +139,13 @@ plot_grid(a1, a2, a3, ncol = 3)
 
 prediction_fnn <- decoder(encoder(test_batch[[1]]))
 
-prediction_fnn[1:10, , 1] %>% as.array()
-
-test_batch[[2]][1:10, , 1] %>% as.array()
-
-test_batch[[1]][1:10, , 1] %>% as.array()
-
-
 mse_fnn <- get_mse(test_batch, prediction_fnn)
-
+mse_fnn
 
 
 # lstm --------------------------------------------------------------------
 
-model <- lstm(n_latent, n_timesteps, n_features, dropout = 0.3, recurrent_dropout = 0.3,
-              optimizer = optimizer_adam(lr =  1e-4))
+model <- lstm(n_latent, n_timesteps, n_features, n_hidden, dropout = 0.2, recurrent_dropout = 0.2)
 
 history <- model %>% fit(
   ds_train,
@@ -155,7 +157,7 @@ model %>% save_model_hdf5("ecg-lstm.hdf5")
 prediction_lstm <- model %>% predict(ds_test)
 
 mse_lstm <- get_mse(test_batch, prediction_lstm)
-
+mse_lstm
 # for mult = 1
 # > mse_fnn
 # [1] 0.3053243 0.4761404 0.6203175 0.7721968 0.8630189 0.9154946 0.9216658 0.8994402

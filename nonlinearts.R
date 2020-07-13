@@ -12,12 +12,16 @@ ds <- ds[1:10000]
 
 # correlation dim <= information dim <= capacity dim (box counting)
 
+
+# https://www.sciencedirect.com/science/article/abs/pii/0167278983901252
 # The relevant definitions of dimension are of two general types, those that depend only on metric properties,
 # and those that depend on the frequency with which a typical trajectory visits different regions of the attractor.
 # ... the conclusion that a all of the frequency dependent dimensions take on the same value,
 # which we call the “dimension of the natural measure”, and all of the metric dimensions take on a common value,
 # which we call the “fractal dimension”.
 # Furthermore, the dimension of the natural measure is typically equal to the Lyapunov dimension
+
+# see also: https://www.scielo.br/scielo.php?script=sci_arttext&pid=S0100-73862001000400004
 
 # embedding ---------------------------------------------------------------
 
