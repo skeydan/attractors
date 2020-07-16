@@ -6,46 +6,42 @@ library(tidyverse)
 library(cowplot)
 
 
+#ecg_train <- py_load_object("data/ecg_train.pkl")
+#ecg_test <- py_load_object("data/ecg_test.pkl")
 
-ecg_train <- py_load_object("data/ecg_train.pkl")
-ecg_test <- py_load_object("data/ecg_test.pkl")
+n <- 10000
 
-n <- 5000
-ecg_train <- ecg_train[1:n]
-ecg_test <- ecg_test[1:n]
+#ecg <- c(ecg_train[1:(n/2)], ecg_test[1:(n/2)])
 
-ggplot(data.frame(bpm = ecg_train[1:1000]), aes(x = 1:1000, y = bpm)) + 
+#as.data.frame(ecg) %>% write_csv("data/ecg.csv", col_names = FALSE)
+ecg <-
+  read_csv("data/ecg.csv", col_names = FALSE) %>% select(X1) %>% pull() %>% unclass()
+
+e1000 <- ggplot(data.frame(temp = ecg[1:1000]), aes(x = 1:1000, y = temp)) +
   geom_line() +
   theme_classic() +
-  theme(
-    axis.title.x=element_blank(),
-    axis.ticks.x=element_blank())
+  theme(axis.title = element_blank())
 
-ggplot(data.frame(bpm = ecg_train[1:400]), aes(x = 1:400, y = bpm)) + 
+e400 <- ggplot(data.frame(temp = ecg[1:400]), aes(x = 1:400, y = temp)) +
   geom_line() +
   theme_classic() +
-  theme(
-    axis.title.x=element_blank(),
-    axis.ticks.x=element_blank())
+  theme(axis.title = element_blank())
 
-ecg_train <- scale(ecg_train)
-train_mean <- attr(ecg_train, "scaled:center")
-train_sd <- attr(ecg_train, "scaled:scale")
-ecg_test <- scale(ecg_test, center = train_mean, scale = train_sd)
+plot_grid(e1000, e400, nrow = 2)
 
-n_timesteps <- 120
+ecg <- scale(ecg)
+
+n_timesteps <- 12
 batch_size <- 32
 
-train <- gen_timesteps(ecg_train, 2 * n_timesteps)
-test <- gen_timesteps(ecg_test, 2 * n_timesteps) 
+train <- gen_timesteps(ecg[1:(n / 2)], 2 * n_timesteps)
+test <- gen_timesteps(ecg[(n / 2):n], 2 * n_timesteps)
 
 dim(train) <- c(dim(train), 1)
 dim(test) <- c(dim(test), 1)
 
 x_train <- train[ , 1:n_timesteps, , drop = FALSE]
 y_train <- train[ , (n_timesteps + 1):(2*n_timesteps), , drop = FALSE]
-x_train[1:4, , 1]
-y_train[1:4, , 1]
 
 ds_train <- tensor_slices_dataset(list(x_train, y_train)) %>%
   dataset_shuffle(nrow(x_train)) %>%
@@ -89,18 +85,21 @@ fnn_weight <- fnn_multiplier * nrow(x_train)/batch_size
 
 optimizer <- optimizer_adam(lr = 1e-3)
 
-for (epoch in 1:200) {
-  cat("Epoch: ", epoch, " -----------\n")
-  training_loop(ds_train)
-  
-  test_batch <- as_iterator(ds_test) %>% iter_next()
-  encoded <- encoder(test_batch[[1]]) 
-  test_var <- tf$math$reduce_variance(encoded, axis = 0L)
-  print(test_var %>% as.numeric() %>% round(5))
-}
+# for (epoch in 1:200) {
+#   cat("Epoch: ", epoch, " -----------\n")
+#   training_loop(ds_train)
+#   
+#   test_batch <- as_iterator(ds_test) %>% iter_next()
+#   encoded <- encoder(test_batch[[1]]) 
+#   test_var <- tf$math$reduce_variance(encoded, axis = 0L)
+#   print(test_var %>% as.numeric() %>% round(5))
+# }
+# 
+# encoder %>% save_model_weights_tf(paste0("ecg_encoder_", fnn_multiplier))
+# decoder %>% save_model_weights_tf(paste0("ecg_decoder_", fnn_multiplier))
 
-encoder %>% save_model_weights_tf(paste0("ecg_encoder_", fnn_multiplier))
-decoder %>% save_model_weights_tf(paste0("ecg_decoder_", fnn_multiplier))
+encoder %>% load_model_weights_tf(paste0("ecg_encoder_", fnn_multiplier))
+decoder %>% load_model_weights_tf(paste0("ecg_decoder_", fnn_multiplier))
 
 # check variances -------------------------------------------------------------
 
@@ -112,6 +111,8 @@ encoded <- encoder(test_batch[[1]]) %>%
 
 encoded %>% summarise_all(var)
 
+# 0.110 1.16e-11     3.78e-9 0.0000992    9.63e-9  4.65e-5 1.21e-4    9.91e-9    3.81e-9   2.71e-8
+
 
 # plot attractors on test set ---------------------------------------------------
 
@@ -120,12 +121,12 @@ a1 <- ggplot(encoded, aes(V1, V2)) +
   theme_classic() +
   theme(aspect.ratio = 1)
 
-a2 <- ggplot(encoded, aes(V1, V3)) +
+a2 <- ggplot(encoded, aes(V1, V4)) +
   geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
 
-a3 <- ggplot(encoded, aes(V2, V3)) +
+a3 <- ggplot(encoded, aes(V2, V4)) +
   geom_path(size = 0.1, color = "darkgrey") +
   theme_classic() +
   theme(aspect.ratio = 1)
@@ -142,27 +143,69 @@ prediction_fnn <- decoder(encoder(test_batch[[1]]))
 mse_fnn <- get_mse(test_batch, prediction_fnn)
 mse_fnn
 
-
 # lstm --------------------------------------------------------------------
 
-model <- lstm(n_latent, n_timesteps, n_features, n_hidden, dropout = 0.2, recurrent_dropout = 0.2)
+# model <- lstm(n_latent, n_timesteps, n_features, n_hidden, dropout = 0.2, recurrent_dropout = 0.2)
+# 
+# history <- model %>% fit(
+#   ds_train,
+#   validation_data = ds_test,
+#   epochs = 200)
+# 
+# model %>% save_model_hdf5("ecg-lstm.hdf5")
 
-history <- model %>% fit(
-  ds_train,
-  validation_data = ds_test,
-  epochs = 200)
-
-model %>% save_model_hdf5("ecg-lstm.hdf5")
+model <- load_model_hdf5("ecg-lstm.hdf5")
 
 prediction_lstm <- model %>% predict(ds_test)
 
 mse_lstm <- get_mse(test_batch, prediction_lstm)
 mse_lstm
-# for mult = 1
-# > mse_fnn
-# [1] 0.3053243 0.4761404 0.6203175 0.7721968 0.8630189 0.9154946 0.9216658 0.8994402
-# > mse_lstm
-# [1] 1.019974 1.060477 1.084976 1.086563 1.075706 1.063090 1.051633 1.042064
+
+
+# compare errors ----------------------------------------------------------
+
+mses <- data.frame(timestep = 1:n_timesteps, fnn = mse_fnn, lstm = mse_lstm) %>%
+  gather(key = "type", value = "mse", -timestep)
+ggplot(mses, aes(timestep, mse, color = type)) +
+  geom_point() +
+  scale_color_manual(values = c("#00008B", "#3CB371")) +
+  theme_classic() +
+  theme(legend.position = "none") 
+
+
+
+# plot --------------------------------------------------------------------
+
+
+given <- data.frame(
+  as.array(
+    tf$concat(list(test_batch[[1]][ , , 1], test_batch[[2]][ , , 1]),
+              axis = 1L)) %>% t()) %>% 
+  add_column(type = "given") %>%
+  add_column(num = 1:(2 * n_timesteps))
+
+fnn <- data.frame(as.array(prediction_fnn[ , , 1]) %>% 
+                    t()) %>%
+  add_column(type = "fnn") %>%
+  add_column(num = (n_timesteps  +1):(2 * n_timesteps))
+
+lstm <- data.frame(as.array(prediction_lstm[ , , 1]) %>% 
+                     t()) %>%
+  add_column(type = "lstm") %>%
+  add_column(num = (n_timesteps + 1):(2 * n_timesteps))
+
+compare_preds_df <- bind_rows(given, lstm, fnn)
+
+plots <- purrr::map(sample(1: dim(compare_preds_df)[2], 16), 
+                    function(v) ggplot(compare_preds_df, aes(num, .data[[paste0("X", v)]], color = type)) +
+                      geom_line() + 
+                      theme_classic() + 
+                      theme(legend.position = "none", axis.title = element_blank()) +
+                      scale_color_manual(values=c("#00008B", "#DB7093", "#3CB371")))
+
+
+plot_grid(plotlist = plots, ncol = 4)
+
 
 
 

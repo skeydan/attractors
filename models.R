@@ -1,6 +1,6 @@
 encoder_model <- function(n_timesteps,
                           n_features,
-                          n_hidden,
+                          n_recurrent,
                           n_latent,
                           name = NULL) {
   
@@ -8,7 +8,7 @@ encoder_model <- function(n_timesteps,
     
     self$noise <- layer_gaussian_noise(stddev = 0.5)
     self$lstm1 <-  layer_lstm(
-      units = n_hidden,
+      units = n_recurrent,
       input_shape = c(n_timesteps, n_features),
       return_sequences = TRUE
     ) 
@@ -32,7 +32,7 @@ encoder_model <- function(n_timesteps,
 
 decoder_model <- function(n_timesteps,
                           n_features,
-                          n_hidden,
+                          n_recurrent,
                           n_latent,
                           name = NULL) {
   
@@ -41,7 +41,7 @@ decoder_model <- function(n_timesteps,
     self$repeat_vector <- layer_repeat_vector(n = n_timesteps)
     self$noise <- layer_gaussian_noise(stddev = 0.5)
     self$lstm <- layer_lstm(
-      units = n_hidden,
+      units = n_recurrent,
       return_sequences = TRUE,
       go_backwards = TRUE
     ) 
@@ -61,18 +61,18 @@ decoder_model <- function(n_timesteps,
   })
 }
 
-lstm <- function(n_latent, n_timesteps, n_features, n_hidden, dropout, recurrent_dropout,
+lstm <- function(n_latent, n_timesteps, n_features, n_recurrent, dropout, recurrent_dropout,
                  optimizer = optimizer_adam(lr =  1e-3)) {
   model <- keras_model_sequential() %>%
     layer_lstm(
-      units = n_hidden,
+      units = n_recurrent,
       input_shape = c(n_timesteps, n_features),
       dropout = dropout, 
       recurrent_dropout = recurrent_dropout,
       return_sequences = TRUE
     ) %>% 
     layer_lstm(
-      units = n_hidden,
+      units = n_recurrent,
       dropout = dropout,
       recurrent_dropout = recurrent_dropout,
       return_sequences = TRUE

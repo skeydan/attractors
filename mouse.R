@@ -6,30 +6,31 @@ library(tidyverse)
 library(cowplot)
 
 
-
-mouse <- py_load_object("data/mouse.pkl")
+#mouse <- py_load_object("data/mouse.pkl")
 
 n <- 10000
-mouse <- mouse[1:(2 * n)]
+#mouse <- mouse[1:n]
 
-ggplot(data.frame(kw = mouse[1:2000]), aes(x = 1:2000, y = kw)) + 
+#as.data.frame(mouse) %>% write_csv("data/mouse.csv", col_names = FALSE)
+mouse <-
+  read_csv("data/mouse.csv", col_names = FALSE) %>% select(X1) %>% pull() %>% unclass()
+
+m2000 <- ggplot(data.frame(temp = mouse[1:2000]), aes(x = 1:2000, y = temp)) +
   geom_line() +
   theme_classic() +
-  theme(
-    axis.title.x=element_blank(),
-    axis.ticks.x=element_blank())
+  theme(axis.title = element_blank())
 
-ggplot(data.frame(kw = mouse[1:500]), aes(x = 1:500, y = kw)) + 
+m500 <- ggplot(data.frame(temp = mouse[1:500]), aes(x = 1:500, y = temp)) +
   geom_line() +
   theme_classic() +
-  theme(
-    axis.title.x=element_blank(),
-    axis.ticks.x=element_blank())
+  theme(axis.title = element_blank())
+
+plot_grid(m2000, m500, nrow = 2)
+
+n_timesteps <- 12
+batch_size <- 32
 
 mouse <- scale(mouse)
-
-n_timesteps <- 200
-batch_size <- 32
 
 train <- gen_timesteps(mouse[1:(n/2)], 2 * n_timesteps)
 test <- gen_timesteps(mouse[(n/2):n], 2 * n_timesteps) 
@@ -39,8 +40,6 @@ dim(test) <- c(dim(test), 1)
 
 x_train <- train[ , 1:n_timesteps, , drop = FALSE]
 y_train <- train[ , (n_timesteps + 1):(2*n_timesteps), , drop = FALSE]
-x_train[1:4, , 1]
-y_train[1:4, , 1]
 
 ds_train <- tensor_slices_dataset(list(x_train, y_train)) %>%
   dataset_shuffle(nrow(x_train)) %>%
@@ -83,18 +82,21 @@ fnn_weight <- fnn_multiplier * nrow(x_train)/batch_size
 
 optimizer <- optimizer_adam(lr = 1e-3)
 
-for (epoch in 1:200) {
-  cat("Epoch: ", epoch, " -----------\n")
-  training_loop(ds_train)
-  
-  test_batch <- as_iterator(ds_test) %>% iter_next()
-  encoded <- encoder(test_batch[[1]]) 
-  test_var <- tf$math$reduce_variance(encoded, axis = 0L)
-  print(test_var %>% as.numeric() %>% round(5))
-}
+# for (epoch in 1:200) {
+#   cat("Epoch: ", epoch, " -----------\n")
+#   training_loop(ds_train)
+#   
+#   test_batch <- as_iterator(ds_test) %>% iter_next()
+#   encoded <- encoder(test_batch[[1]]) 
+#   test_var <- tf$math$reduce_variance(encoded, axis = 0L)
+#   print(test_var %>% as.numeric() %>% round(5))
+# }
+# 
+# encoder %>% save_model_weights_tf(paste0("mouse_encoder_", fnn_multiplier))
+# decoder %>% save_model_weights_tf(paste0("mouse_decoder_", fnn_multiplier))
 
-encoder %>% save_model_weights_tf(paste0("mouse_encoder_", fnn_multiplier))
-decoder %>% save_model_weights_tf(paste0("mouse_decoder_", fnn_multiplier))
+encoder %>% load_model_weights_tf(paste0("mouse_encoder_", fnn_multiplier))
+decoder %>% load_model_weights_tf(paste0("mouse_decoder_", fnn_multiplier))
 
 # check variances -------------------------------------------------------------
 
@@ -105,6 +107,7 @@ encoded <- encoder(test_batch[[1]]) %>%
   as_tibble()
 
 encoded %>% summarise_all(var)
+# 0.0796 0.00246 0.000214    2.26e-7      2.71e-9     4.22e-8 6.45e-10 1.61e-4 2.63e-10    2.05e-8
 
 
 # plot attractors on test set ---------------------------------------------------
@@ -137,16 +140,19 @@ mse_fnn <- get_mse(test_batch, prediction_fnn)
 
 mse_fnn
 
+
 # lstm --------------------------------------------------------------------
 
-model <- lstm(n_latent, n_timesteps, n_features, n_hidden, dropout = 0.2, recurrent_dropout = 0.2)
+# model <- lstm(n_latent, n_timesteps, n_features, n_hidden, dropout = 0.2, recurrent_dropout = 0.2)
+# 
+# history <- model %>% fit(
+#   ds_train,
+#   validation_data = ds_test,
+#   epochs = 200)
+# 
+# model %>% save_model_hdf5("mouse-lstm.hdf5")
 
-history <- model %>% fit(
-  ds_train,
-  validation_data = ds_test,
-  epochs = 200)
-
-model %>% save_model_hdf5("mouse-lstm.hdf5")
+model <- load_model_hdf5("mouse-lstm.hdf5")
 
 prediction_lstm <- model %>% predict(ds_test)
 
@@ -154,11 +160,47 @@ mse_lstm <- get_mse(test_batch, prediction_lstm)
 mse_lstm
 
 
+# compare errors ----------------------------------------------------------
 
-#
+mses <- data.frame(timestep = 1:n_timesteps, fnn = mse_fnn, lstm = mse_lstm) %>%
+  gather(key = "type", value = "mse", -timestep)
+ggplot(mses, aes(timestep, mse, color = type)) +
+  geom_point() +
+  scale_color_manual(values = c("#00008B", "#3CB371")) +
+  theme_classic() +
+  theme(legend.position = "none") 
 
-# > mse_fnn
-# [1] 0.007859814 0.013104261 0.016770325 0.021908303 0.029646938 0.038758405 0.050011331 0.064407731
-# > mse_lstm
-# [1] 0.30758243 0.16506516 0.12208551 0.09304894 0.07583015 0.06916708 0.06846981 0.06907555
+
+# plot --------------------------------------------------------------------
+
+
+given <- data.frame(
+  as.array(
+    tf$concat(list(test_batch[[1]][ , , 1], test_batch[[2]][ , , 1]),
+              axis = 1L)) %>% t()) %>% 
+  add_column(type = "given") %>%
+  add_column(num = 1:(2 * n_timesteps))
+
+fnn <- data.frame(as.array(prediction_fnn[ , , 1]) %>% 
+                    t()) %>%
+  add_column(type = "fnn") %>%
+  add_column(num = (n_timesteps  +1):(2 * n_timesteps))
+
+lstm <- data.frame(as.array(prediction_lstm[ , , 1]) %>% 
+                     t()) %>%
+  add_column(type = "lstm") %>%
+  add_column(num = (n_timesteps + 1):(2 * n_timesteps))
+
+compare_preds_df <- bind_rows(given, lstm, fnn)
+
+plots <- purrr::map(sample(1: dim(compare_preds_df)[2], 16), 
+                    function(v) ggplot(compare_preds_df, aes(num, .data[[paste0("X", v)]], color = type)) +
+                      geom_line() + 
+                      theme_classic() + 
+                      theme(legend.position = "none", axis.title = element_blank()) +
+                      scale_color_manual(values=c("#00008B", "#DB7093", "#3CB371")))
+
+
+plot_grid(plotlist = plots, ncol = 4)
+
 
