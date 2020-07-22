@@ -63,7 +63,7 @@ kl_weight <- 1
 optimizer <- optimizer_adam(lr = 1e-3)
 
 
-for (epoch in 1:200) {
+for (epoch in 1:500) {
   cat("Epoch: ", epoch, " -----------\n")
   training_loop_vae(ds_train)
 
