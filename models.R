@@ -194,7 +194,6 @@ vae_encoder_model <- function(n_timesteps,
                                n_latent,
                                name = NULL) {
   keras_model_custom(name = name, function(self) {
-    #self$noise <- layer_gaussian_noise(stddev = 0.5)
     self$conv1 <- layer_conv_1d(kernel_size = 3,
                                 filters = 16,
                                 strides = 2)
@@ -221,7 +220,6 @@ vae_encoder_model <- function(n_timesteps,
     
     function (x, mask = NULL) {
       x %>%
-        #self$noise() %>%
         self$conv1() %>%
         self$act1() %>%
         self$batchnorm1() %>%
@@ -244,7 +242,6 @@ vae_decoder_model <- function(n_timesteps,
                                name = NULL) {
   keras_model_custom(name = name, function(self) {
     self$reshape <- layer_reshape(target_shape = c(1, n_latent))
-    #self$noise <- layer_gaussian_noise(stddev = 0.5)
     self$conv1 <- layer_conv_1d_transpose(kernel_size = 15,
                                           filters = 64,
                                           strides = 3)
@@ -267,14 +264,13 @@ vae_decoder_model <- function(n_timesteps,
       kernel_size = 7,
       filters = 1,
       strides = 1,
-      activation = "linear" ## ?
+      activation = "linear"
     )
     self$batchnorm4 <- layer_batch_normalization()
     
     function (x, mask = NULL) {
       x %>%
         self$reshape() %>%
-        #self$noise() %>%
         self$conv1() %>%
         self$act1() %>%
         self$batchnorm1() %>%
