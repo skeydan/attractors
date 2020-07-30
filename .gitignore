@@ -8,4 +8,6 @@ convection.txt
 *.index
 *.gif
 *.hdf5
+*.png
+*.rds
 
